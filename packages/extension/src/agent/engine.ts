@@ -106,37 +106,27 @@ export class AgentEngine {
 
         yield `\n\n🔧 **Executing:** \`${tc.function.name}\`\n`;
 
-        // Request approval for write/execute operations
-        const needsApproval = ['write_file', 'execute_command', 'browser_action'].includes(tc.function.name);
+        // Request approval for write/execute/browser operations
+        const needsApproval = ['write_file', 'edit_file', 'execute_command', 'browser_action'].includes(tc.function.name);
         let approved = !needsApproval;
 
         if (needsApproval) {
           const args = JSON.parse(tc.function.arguments);
           const desc = tc.function.name === 'execute_command'
             ? `Command: ${args.command}`
+            : tc.function.name === 'browser_action'
+            ? `Browser: ${args.action || 'navigate'} ${args.url || ''}`
             : `Write to: ${args.path}`;
 
-          approved = await approvalManager.requestApproval(
-            tc.function.name === 'execute_command' ? 'command_exec' : 'file_write',
-            `Agent wants to ${tc.function.name}`,
-            desc,
-            tc.function.name === 'write_file' ? args.content?.slice(0, 500) : undefined,
-            { toolCall: tc },
+          // Use VS Code QuickPick for approval (synchronous UI)
+          const choice = await vscode.window.showQuickPick(
+            ['Approve', 'Reject', 'Approve all'],
+            { placeHolder: `Agent wants to ${tc.function.name}: ${desc}`, ignoreFocusOut: true },
           );
-
-          if (!approved) {
-            yield '\n⛔ **Rejected** by user.\n';
-            this.messages.push({
-              role: 'assistant',
-              content: null,
-              toolCalls: [tc],
-            });
-            this.messages.push({
-              role: 'tool',
-              toolCallId: tc.id,
-              content: 'User rejected this operation.',
-            });
-            continue;
+          approved = choice === 'Approve' || choice === 'Approve all';
+          if (choice === 'Approve all') {
+            approvalManager.setAutoApprove(true);
+            approved = true;
           }
         }
 
@@ -161,32 +151,52 @@ export class AgentEngine {
         }
 
         // Show diff for file writes + create artifact
-        if (tc.function.name === 'write_file' && !result.error) {
+        if (['write_file', 'edit_file'].includes(tc.function.name) && !result.error) {
           const filePath = args.path as string;
-          const newContent = args.content as string;
-          const originalContent = '';
+          const newContent = args.content || (args.new_string as string) || '';
+          const originalContent = tc.function.name === 'edit_file' ? '' : ''; // TODO: read original
           const diff = diffManager.generateDiff(filePath, originalContent, newContent);
           yield `\n\`\`\`diff\n${diff}\n\`\`\`\n`;
-
           artifactStore.create(this.runId, 'diff', `Changes to ${filePath}`, diff, 'completed');
         }
 
-        // Recurse: send tool result back to model
-        const followupMessages = this.messages.map((m) => ({
+        // Recurse: send tool result back to model, handling further tool calls
+        const mapMessages = () => this.messages.map((m) => ({
           role: m.role,
           content: m.content,
           ...(m.toolCalls ? { tool_calls: m.toolCalls.map((t) => ({
-            id: t.id,
-            type: t.type,
+            id: t.id, type: t.type,
             function: { name: t.function.name, arguments: t.function.arguments },
           })) } : {}),
           ...(m.toolCallId ? { tool_call_id: m.toolCallId } : {}),
         }));
 
-        for await (const fChunk of streamChat(this.model, followupMessages as any[], systemPrompt)) {
-          if (fChunk.type === 'text' && fChunk.content) {
-            fullResponse += fChunk.content;
-            yield fChunk.content;
+        let recurseAgain = true;
+        let recurseIter = 0;
+        let msgs = mapMessages();
+
+        while (recurseAgain && recurseIter < 3) {
+          recurseAgain = false;
+          recurseIter++;
+          for await (const fChunk of streamChat(this.model, msgs as any[], systemPrompt)) {
+            if (fChunk.type === 'text' && fChunk.content) {
+              fullResponse += fChunk.content;
+              yield fChunk.content;
+            }
+            if (fChunk.type === 'tool_call' && fChunk.toolCall) {
+              const fTc = fChunk.toolCall as { id: string; type: 'function'; function: { name: string; arguments: string } };
+              if (++toolIteration > MAX_TOOL_ITERATIONS) { yield '\n⚠️ Max iterations\n'; break; }
+              yield `\n🔧 **Executing:** \`${fTc.function.name}\`\n`;
+
+              const fArgs = JSON.parse(fTc.function.arguments);
+              const fResult = await executeTool(fTc.function.name, fArgs);
+              this.messages.push({ role: 'assistant', content: null, toolCalls: [fTc] });
+              this.messages.push({ role: 'tool', toolCallId: fTc.id, content: fResult.error || fResult.content });
+              yield fResult.error ? `\n⚠️ ${fResult.error}\n` : `\n✅ Done\n`;
+              msgs = mapMessages();
+              recurseAgain = true;
+              break; // break out of inner loop, restart with updated messages
+            }
           }
         }
       }

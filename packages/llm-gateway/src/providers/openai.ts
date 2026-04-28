@@ -9,7 +9,7 @@ export const openaiProvider: LLMProvider = {
 
   isAvailable(): boolean { return !!providerKeys.openai.apiKey; },
 
-  listModels(): string[] { return ['gpt-5.2', 'gpt-4o', 'gpt-4o-mini']; },
+  listModels(): string[] { return ['gpt-4.1', 'gpt-4o', 'gpt-4o-mini', 'o3-mini']; },
 
   async *chat(model: string, messages: ChatMessage[], options?: { system?: string; maxTokens?: number; temperature?: number }): AsyncIterable<StreamChunk> {
     const client = new OpenAI({ apiKey: providerKeys.openai.apiKey, baseURL: providerKeys.openai.baseUrl });

@@ -9,7 +9,7 @@ export const googleProvider: LLMProvider = {
 
   isAvailable(): boolean { return !!providerKeys.google.apiKey; },
 
-  listModels(): string[] { return ['gemini-3-pro', 'gemini-3-flash']; },
+  listModels(): string[] { return ['gemini-2.5-pro', 'gemini-2.5-flash']; },
 
   async *chat(model: string, messages: ChatMessage[], options?: { system?: string; maxTokens?: number; temperature?: number }): AsyncIterable<StreamChunk> {
     const genAI = new GoogleGenerativeAI(providerKeys.google.apiKey);

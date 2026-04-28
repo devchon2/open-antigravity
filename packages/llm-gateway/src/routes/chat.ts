@@ -1,11 +1,15 @@
 ﻿import type { FastifyInstance } from 'fastify';
+import { validateChatRequest } from '@open-antigravity/shared';
 import { findModel } from '../providers/registry.js';
 import { formatSSEChunk, formatSSEDone, formatSSEError } from '../utils/streaming.js';
-import type { ChatMessage } from '@open-antigravity/shared';
 
 export async function chatRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/chat', async (request, reply) => {
-    const body = request.body as { model: string; messages: ChatMessage[]; system?: string; max_tokens?: number; temperature?: number; stream?: boolean };
+    const validation = validateChatRequest(request.body);
+    if (!validation.success) {
+      return reply.status(400).send({ error: { code: 'VALIDATION_ERROR', message: validation.error } });
+    }
+    const body = validation.data;
     if (!body?.model || !body?.messages?.length) {
       return reply.status(400).send({ error: { code: 'VALIDATION_ERROR', message: 'model and messages are required' } });
     }

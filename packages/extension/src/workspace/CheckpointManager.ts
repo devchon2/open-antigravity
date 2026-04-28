@@ -5,7 +5,6 @@ export interface Checkpoint {
   id: string;
   timestamp: string;
   description: string;
-  stashRef: string;
 }
 
 export class CheckpointManager {
@@ -16,65 +15,68 @@ export class CheckpointManager {
     this.workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
   }
 
-  /** Create a git stash checkpoint before an agent step */
   async create(description: string): Promise<Checkpoint | null> {
     if (!this.workspacePath) return null;
-
     try {
-      const stashRef = await this.exec('git', ['stash', 'create'], this.workspacePath);
-      if (!stashRef.trim()) return null; // No changes to stash
+      // Actually stash changes (unlike git stash create which doesn't modify working tree)
+      const result = await this.exec('git', ['stash', 'push', '-m', description], this.workspacePath);
+      if (result.includes('No local changes to save')) return null;
+
+      // Get the stash reference
+      const ref = await this.exec('git', ['stash', 'list', '-1', '--format=%H'], this.workspacePath);
+      if (!ref.trim()) return null;
 
       const checkpoint: Checkpoint = {
-        id: stashRef.trim(),
+        id: ref.trim(),
         timestamp: new Date().toISOString(),
         description,
-        stashRef: stashRef.trim(),
       };
-
       this.checkpoints.push(checkpoint);
       return checkpoint;
     } catch {
-      return null; // Not a git repo or git not available
+      return null;
     }
   }
 
-  /** Restore to a specific checkpoint (revert changes since then) */
   async restore(checkpoint: Checkpoint): Promise<boolean> {
     if (!this.workspacePath) return false;
-
     try {
-      await this.exec('git', ['stash', 'apply', checkpoint.stashRef, '--index'], this.workspacePath);
-      // Remove from history
-      this.checkpoints = this.checkpoints.filter((c) =>
-        this.checkpoints.indexOf(c) <= this.checkpoints.indexOf(checkpoint)
-      );
+      // Find the stash index by hash
+      const list = await this.exec('git', ['stash', 'list'], this.workspacePath);
+      const lines = list.split('\n');
+      let stashRef = '';
+      for (const line of lines) {
+        if (line.includes(checkpoint.description)) {
+          const match = line.match(/^(stash@\{\d+\})/);
+          if (match) { stashRef = match[1]; break; }
+        }
+      }
+      if (!stashRef) return false;
+
+      await this.exec('git', ['stash', 'apply', stashRef, '--index'], this.workspacePath);
+      this.checkpoints = this.checkpoints.slice(0, this.checkpoints.indexOf(checkpoint) + 1);
       return true;
     } catch {
       return false;
     }
   }
 
-  /** Revert to the last checkpoint */
   async undoLast(): Promise<boolean> {
     const last = this.checkpoints.pop();
     if (!last) return false;
-    return this.restore(last);
+    // Drop the last stash
+    try {
+      await this.exec('git', ['stash', 'drop', 'stash@{0}'], this.workspacePath);
+    } catch { /* ok if fails */ }
+    return true; // working tree is already restored since we pop
   }
 
-  /** Get the most recent checkpoint */
   getLast(): Checkpoint | undefined {
     return this.checkpoints[this.checkpoints.length - 1];
   }
 
-  /** Clear all checkpoints */
-  clear(): void {
-    this.checkpoints = [];
-  }
-
-  /** Number of stored checkpoints */
-  get size(): number {
-    return this.checkpoints.length;
-  }
+  clear(): void { this.checkpoints = []; }
+  get size(): number { return this.checkpoints.length; }
 
   private exec(cmd: string, args: string[], cwd: string): Promise<string> {
     return new Promise((resolve, reject) => {

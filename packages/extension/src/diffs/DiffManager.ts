@@ -12,89 +12,100 @@ export interface FileChange {
 export class DiffManager {
   private changes: Map<string, FileChange> = new Map();
 
-  /** Generate a unified diff between original and new content */
+  /** Generate unified diff using Myers-like LCS algorithm */
   generateDiff(filePath: string, original: string, modified: string): string {
-    const lines: string[] = [];
-    const heading = `--- a/${filePath}\n+++ b/${filePath}`;
-    lines.push(heading);
-
     const origLines = original.split('\n');
     const modLines = modified.split('\n');
-    const maxLen = Math.max(origLines.length, modLines.length);
-    let i = 0, j = 0;
+    const lcs = this.computeLCS(origLines, modLines);
 
-    while (i < maxLen || j < maxLen) {
-      const oLine = i < origLines.length ? origLines[i] : undefined;
-      const mLine = j < modLines.length ? modLines[j] : undefined;
+    const result: string[] = [];
+    result.push(`--- a/${filePath}`);
+    result.push(`+++ b/${filePath}`);
 
-      if (oLine === mLine) {
-        if (oLine !== undefined) lines.push(` ${oLine}`);
-        i++; j++;
+    let oi = 0, mi = 0, li = 0;
+    const hunks: Array<{ oStart: number; oCount: number; mStart: number; mCount: number; lines: string[] }> = [];
+    let currentHunk: typeof hunks[0] | null = null;
+
+    while (oi < origLines.length || mi < modLines.length) {
+      if (li < lcs.length && oi < origLines.length && mi < modLines.length &&
+          origLines[oi] === lcs[li] && modLines[mi] === lcs[li]) {
+        // Common line
+        if (currentHunk && currentHunk.lines.length > 0) {
+          hunks.push(currentHunk);
+          currentHunk = null;
+        }
+        oi++; mi++; li++;
       } else {
-        if (oLine !== undefined) { lines.push(`-${oLine}`); i++; }
-        if (mLine !== undefined) { lines.push(`+${mLine}`); j++; }
+        if (!currentHunk) {
+          const contextStart = Math.max(0, oi - 3);
+          currentHunk = { oStart: contextStart, oCount: 0, mStart: Math.max(0, mi - 3), mCount: 0, lines: [] };
+        }
+        if (oi < origLines.length && (li >= lcs.length || origLines[oi] !== lcs[li])) {
+          currentHunk.lines.push(`-${origLines[oi]}`);
+          oi++;
+        }
+        if (mi < modLines.length && (li >= lcs.length || modLines[mi] !== lcs[li])) {
+          currentHunk.lines.push(`+${modLines[mi]}`);
+          mi++;
+        }
       }
     }
-    return lines.join('\n');
+    if (currentHunk && currentHunk.lines.length > 0) hunks.push(currentHunk);
+
+    for (const hunk of hunks) {
+      if (hunk.lines.length === 0) continue;
+      const oLen = hunk.lines.filter(l => l.startsWith('-') || l.startsWith(' ')).length || 1;
+      const mLen = hunk.lines.filter(l => l.startsWith('+') || l.startsWith(' ')).length || 1;
+      result.push(`@@ -${hunk.oStart + 1},${oLen} +${hunk.mStart + 1},${mLen} @@`);
+      result.push(...hunk.lines);
+    }
+
+    return result.join('\n');
   }
 
-  /** Show a diff in the VS Code diff editor */
-  async showDiff(filePath: string, change: FileChange): Promise<boolean> {
+  /** Open a VS Code diff editor to show proposed changes */
+  async showDiff(filePath: string, change: FileChange): Promise<void> {
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
     const fullPath = path.isAbsolute(filePath) ? filePath : path.join(workspaceRoot, filePath);
-    
     const originalUri = vscode.Uri.parse(`untitled:${path.basename(filePath)}.original`);
     const modifiedUri = vscode.Uri.file(fullPath);
 
-    // Write original content to a temp document
     const origDoc = await vscode.workspace.openTextDocument({ content: change.originalContent });
-    await origDoc.save();
 
-    // Show diff
     await vscode.commands.executeCommand('vscode.diff',
-      vscode.Uri.file(origDoc.fileName),
-      modifiedUri,
-      `Proposed: ${path.basename(filePath)} (Accept/Reject in Chat)`
-    );
-
-    // Store the change
+      origDoc.uri, modifiedUri, `Proposed: ${path.basename(filePath)}`);
     this.changes.set(filePath, change);
-    return true;
   }
 
-  /** Apply a stored change to the file */
   async applyChange(filePath: string): Promise<void> {
     const change = this.changes.get(filePath);
-    if (!change) throw new Error(`No change stored for ${filePath}`);
-
+    if (!change) throw new Error(`No change for ${filePath}`);
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
     const fullPath = path.isAbsolute(filePath) ? filePath : path.join(workspaceRoot, filePath);
-
     fs.mkdirSync(path.dirname(fullPath), { recursive: true });
     fs.writeFileSync(fullPath, change.newContent, 'utf-8');
     this.changes.delete(filePath);
   }
 
-  /** Revert a change (restore original content) */
-  async revertChange(filePath: string): Promise<void> {
-    const change = this.changes.get(filePath);
-    if (!change) throw new Error(`No change stored for ${filePath}`);
+  getChange(filePath: string): FileChange | undefined { return this.changes.get(filePath); }
+  clear(): void { this.changes.clear(); }
 
-    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-    const fullPath = path.isAbsolute(filePath) ? filePath : path.join(workspaceRoot, filePath);
+  /** Compute Longest Common Subsequence for diff generation */
+  private computeLCS(a: string[], b: string[]): string[] {
+    const m = a.length, n = b.length;
+    const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+    for (let i = 1; i <= m; i++)
+      for (let j = 1; j <= n; j++)
+        dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
 
-    fs.writeFileSync(fullPath, change.originalContent, 'utf-8');
-    this.changes.delete(filePath);
-  }
-
-  /** Get a stored change */
-  getChange(filePath: string): FileChange | undefined {
-    return this.changes.get(filePath);
-  }
-
-  /** Clear all stored changes */
-  clear(): void {
-    this.changes.clear();
+    const lcs: string[] = [];
+    let i = m, j = n;
+    while (i > 0 && j > 0) {
+      if (a[i - 1] === b[j - 1]) { lcs.unshift(a[i - 1]); i--; j--; }
+      else if (dp[i - 1][j] > dp[i][j - 1]) i--;
+      else j--;
+    }
+    return lcs;
   }
 }
 
