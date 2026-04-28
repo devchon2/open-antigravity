@@ -1,10 +1,11 @@
 /*---------------------------------------------------------------------------------------------
- *  Open-Agent Engine
+ *  Open-Antigravity Agent Engine
  *  Plan -> Approve -> Execute -> Verify loop. Integrated into VSCodium workbench.
- *  Communicates with Open-LLM Gateway (default: localhost:4001).
+ *  Calls LLM APIs directly from the IDE process — no separate gateway service.
  *--------------------------------------------------------------------------------------------*/
 
 import { Emitter, Event } from '../../../../../base/common/event.js';
+import { llmRouter, type ChatMessage as RouterMessage, type StreamChunk } from '../gateway/LLMRouter.js';
 
 export type AgentMode = 'fast' | 'planning';
 export type AgentStatus = 'idle' | 'planning' | 'executing' | 'verifying' | 'done' | 'error';
@@ -42,8 +43,7 @@ export class AgentEngine {
   private messages: ChatMessage[] = [];
   private model: string;
   private runId: string = '';
-  private readonly gatewayUrl: string = 'http://localhost:4001';
-  private readonly gatewayKey: string = 'antigravity-local-dev-key';
+  // LLM routing is embedded in the IDE — no separate gateway needed
 
   private readonly _onChunk = new Emitter<string>();
   readonly onChunk = this._onChunk.event;
@@ -79,7 +79,7 @@ export class AgentEngine {
     while (continueLoop && toolIteration < MAX_TOOLS) {
       continueLoop = false;
 
-      for await (const chunk of this.streamGateway(msgs, systemPrompt)) {
+      for await (const chunk of llmRouter.streamChat(this.model, msgs as RouterMessage[], systemPrompt)) {
         if (chunk.type === 'text' && chunk.content) {
           fullResponse += chunk.content;
           yield chunk.content;
@@ -122,31 +122,7 @@ export class AgentEngine {
     }));
   }
 
-  private async *streamGateway(messages: any[], systemPrompt: string): AsyncIterable<StreamChunk> {
-    const resp = await fetch(`${this.gatewayUrl}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.gatewayKey}` },
-      body: JSON.stringify({ model: this.model, messages, system: systemPrompt, stream: true }),
-    });
-    if (!resp.ok) throw new Error(`Gateway error ${resp.status}`);
-    const reader = resp.body?.getReader();
-    if (!reader) throw new Error('No response body');
-    const dec = new TextDecoder();
-    let buf = '';
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split('\n');
-      buf = lines.pop() || '';
-      for (const l of lines) {
-        if (!l.startsWith('data: ')) continue;
-        const d = l.slice(6).trim();
-        if (!d || d === '[DONE]') continue;
-        try { yield JSON.parse(d); } catch {}
-      }
-    }
-  }
+  // LLM routing is embedded — calls OpenAI/Anthropic/Google/Ollama directly from the IDE
 
   private async executeTool(name: string, args: Record<string, unknown>): Promise<{ content?: string; error?: string }> {
     const { readFileSync, writeFileSync, mkdirSync, readdirSync } = require('fs');

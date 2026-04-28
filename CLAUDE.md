@@ -10,28 +10,24 @@ Open-Antigravity is an open-source clone of Google's Antigravity agentic IDE. Th
 
 ```bash
 npm run build:shared       # Build shared types (required first)
+npm run setup:ide          # Clone VSCodium + inject agent source
+npm run build:ide          # Build desktop IDE (.exe/.app/.AppImage)
+
+# Optional: standalone gateway (for remote/shared deployments)
 npm run build:gateway      # Build LLM Gateway backend
-npm run dev:gateway        # Start gateway on :4001 (tsx watch)
+npm run dev:gateway        # Start gateway on :4001
 
-npm run setup:ide          # Clone VSCodium + inject antigravity source
-npm run build:ide          # Full IDE build (requires setup:ide first)
-
+# Optional: web dashboard
 cd packages/dashboard && npm run dev  # Mission Control on :3000
-```
-
-After `npm run dev:gateway`, verify with:
-```bash
-curl http://localhost:4001/api/health  # -> {"status":"ok",...}
-curl http://localhost:4001/api/models  # -> list of available models
 ```
 
 ## Architecture
 
 ### Three layers
 
-1. **`vscodium/`** — The IDE. Contains `open-antigravity-src/vs/workbench/contrib/open-antigravity/` which gets copied INTO a VSCodium checkout by `prepare_vscode.sh`. The antigravity code becomes a native workbench contribution registered via `IWorkbenchContributionsRegistry` at `LifecyclePhase.Restored`. No extension APIs are used — all VS Code internal APIs (DI, services, workbench).
+1. **`vscodium/`** — The IDE. Contains `open-antigravity-src/vs/workbench/contrib/open-antigravity/` which gets copied INTO a VSCodium checkout by `prepare_vscode.sh`. The antigravity code becomes a native workbench contribution registered via `IWorkbenchContributionsRegistry` at `LifecyclePhase.Restored`. No extension APIs are used — all VS Code internal APIs (DI, services, workbench). **LLM routing is embedded in the IDE** — `LLMRouter` calls OpenAI/Anthropic/Google/Ollama APIs directly from the IDE process. No separate gateway service required.
 
-2. **`packages/llm-gateway/`** — Standalone Fastify backend. Provider pattern: each model provider is a plain object implementing `LLMProvider { name, providerId, isAvailable(), listModels(), chat() }`. Providers registered in `registry.ts`. Streaming uses SSE over raw HTTP. Auth middleware skips on `/api/health` and allows localhost without token when `GATEWAY_API_KEY` is the default `antigravity-local-dev-key`.
+2. **`packages/llm-gateway/`** — Optional standalone Fastify backend for remote/shared deployments. Provider pattern: each model provider is a plain object implementing `LLMProvider`. Not needed for local use — the IDE works out of the box.
 
 3. **`packages/shared/`** — TypeScript interfaces and Zod schemas shared between gateway and the IDE source. Built first.
 
