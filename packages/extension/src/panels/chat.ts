@@ -45,6 +45,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  /** Send a prompt directly into the chat (used by commands like explainCode) */
+  public async sendPrompt(text: string, mode: 'fast' | 'planning' = 'fast'): Promise<void> {
+    if (this.view) {
+      this.view.show(true);
+    }
+    // Wait briefly for webview to be ready
+    await new Promise((r) => setTimeout(r, 200));
+    await this.handleChat(text, mode);
+  }
+
   private async handleChat(text: string, mode: 'fast' | 'planning'): Promise<void> {
     if (!this.view) return;
 

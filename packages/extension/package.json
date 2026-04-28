@@ -39,6 +39,10 @@
       {
         "command": "open-antigravity.sendToAgent",
         "title": "Antigravity: Send to Agent"
+      },
+      {
+        "command": "open-antigravity.inlineCommand",
+        "title": "Antigravity: Inline Command"
       }
     ],
     "viewsContainers": {
@@ -87,6 +91,16 @@
         "command": "open-antigravity.openAgentManager",
         "key": "ctrl+shift+a",
         "mac": "cmd+shift+a"
+      },
+      {
+        "command": "open-antigravity.openAgentManager",
+        "key": "ctrl+e",
+        "mac": "cmd+e"
+      },
+      {
+        "command": "open-antigravity.inlineCommand",
+        "key": "ctrl+i",
+        "mac": "cmd+i"
       }
     ],
     "configuration": {

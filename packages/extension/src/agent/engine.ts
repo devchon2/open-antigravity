@@ -6,6 +6,8 @@ import { diffManager } from '../diffs/DiffManager.js';
 import { approvalManager } from '../approval/ApprovalManager.js';
 import { checkpointManager } from '../workspace/CheckpointManager.js';
 import { artifactStore } from '../artifacts/ArtifactStore.js';
+import { skillLoader } from './SkillLoader.js';
+import { workflowLoader } from './WorkflowLoader.js';
 
 export interface AgentMessage {
   role: 'user' | 'assistant' | 'system' | 'tool';
@@ -38,7 +40,8 @@ export class AgentEngine {
     return [...this.messages];
   }
 
-  async *run(userMessage: string, mode: 'fast' | 'planning' = 'fast'): AsyncIterable<string> {
+  async *run(initialMessage: string, mode: 'fast' | 'planning' = 'fast'): AsyncIterable<string> {
+    let userMessage = initialMessage;
     const config = vscode.workspace.getConfiguration('open-antigravity');
     this.model = config.get<string>('defaultModel', 'gpt-4o');
     this.runId = crypto.randomUUID();
@@ -58,6 +61,27 @@ export class AgentEngine {
     if (workspaceFolders && workspaceFolders.length) {
       systemPrompt += `\n\n## Current Workspace\nRoot: ${workspaceFolders[0].uri.fsPath}`;
       systemPrompt += `\n\n## Available Tools\n${TOOL_DEFINITIONS.map((t) => `- ${t.function.name}: ${t.function.description}`).join('\n')}`;
+    }
+
+    // Check for matching skills (progressive disclosure)
+    const matchingSkills = skillLoader.findMatchingSkills(userMessage);
+    if (matchingSkills.length > 0) {
+      for (const skill of matchingSkills) {
+        skillLoader.loadSkill(skill.name);
+      }
+      const skillInstructions = skillLoader.getLoadedInstructions();
+      if (skillInstructions) {
+        systemPrompt += `\n\n## Active Skills\n${skillInstructions}`;
+      }
+    }
+
+    // Check for /workflow commands in the message
+    const workflowMatch = userMessage.match(/^\/(\S+)/);
+    if (workflowMatch) {
+      const workflow = workflowLoader.matchCommand(workflowMatch[1]);
+      if (workflow) {
+        userMessage = `${workflow.prompt}\n\n---\n${userMessage}`;
+      }
     }
 
     this.messages.push({ role: 'user', content: userMessage });
