@@ -26,35 +26,55 @@ export function AgentChat() {
 
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
-    const msg: Message = { role: "user", content: input, timestamp: new Date().toISOString() };
-    setMessages((prev) => [...prev, msg]);
+    const userMsg: Message = { role: "user", content: input, timestamp: new Date().toISOString() };
+    setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setIsStreaming(true);
     setStreamText("");
 
-    // TODO: connect to gateway backend
-    setTimeout(() => {
-      const resp: Message = {
-        role: "agent",
-        content: `I'm your Open-Antigravity agent. You asked: "${input}"\n\nThis is the Mission Control dashboard — the central hub for orchestrating AI agents. From here you can:\n\n- Spawn multiple agents on different tasks\n- Monitor their progress in real-time\n- Review artifacts (diffs, screenshots, test results)\n- Switch between Planning and Fast mode\n- Provide feedback through artifact comments\n\nTo connect to a real LLM, start the gateway:\n\`\`\`bash\nnpm run dev:gateway\n\`\`\``,
-        timestamp: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, resp]);
-      setStreamText("");
-      setIsStreaming(false);
-    }, 1200);
+    try {
+      const allMsgs = [...messages, userMsg].map((m) => ({ role: m.role === "agent" ? "assistant" : m.role, content: m.content }));
+      const resp = await fetch("http://localhost:4001/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer antigravity-local-dev-key" },
+        body: JSON.stringify({ model: "gpt-4o", messages: allMsgs, stream: true }),
+      });
+      if (!resp.ok) throw new Error("Gateway error " + resp.status);
 
-    // Simulate streaming text
-    const demo = "Analyzing your request and connecting to the agent gateway...\n\nReady to help! ";
-    let i = 0;
-    const interval = setInterval(() => {
-      if (i < demo.length) {
-        setStreamText(demo.slice(0, i + 1));
-        i++;
-      } else {
-        clearInterval(interval);
+      const reader = resp.body?.getReader();
+      if (!reader) throw new Error("No response body");
+      const dec = new TextDecoder();
+      let buf = "", full = "";
+
+      let doneReading = false;
+      while (!doneReading) {
+        const { value, done } = await reader.read();
+        if (done) { doneReading = true; break; }
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() || "";
+        for (const l of lines) {
+          if (!l.startsWith("data: ")) continue;
+          const d = l.slice(6).trim();
+          if (!d || d === "[DONE]") continue;
+          try {
+            const chunk = JSON.parse(d);
+            if (chunk.type === "text" && chunk.content) {
+              full += chunk.content;
+              setStreamText(full);
+            }
+            if (chunk.type === "error") throw new Error(chunk.content || "Unknown error");
+          } catch { void 0 }
+        }
       }
-    }, 30);
+
+      setMessages((prev) => [...prev, { role: "agent", content: full, timestamp: new Date().toISOString() }]);
+      setStreamText("");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Connection failed";
+      setStreamText("Error: " + msg + "\n\nMake sure the gateway is running:\n`npm run dev:gateway`");
+    }
+    setIsStreaming(false);
   };
 
   return (

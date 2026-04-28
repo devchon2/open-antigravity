@@ -1,0 +1,34 @@
+{
+  "name": "open-antigravity",
+  "version": "0.0.1",
+  "private": true,
+  "description": "The Open-Source, Universal AI Gateway for Agentic Development",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev:gateway",
+    "dev:gateway": "npm run dev -w @open-antigravity/llm-gateway",
+    "dev:dashboard": "npm run dev -w @open-antigravity/dashboard 2>/dev/null || echo 'dashboard not in workspace'",
+    "build": "npm run build:shared && npm run build:gateway",
+    "build:gateway": "npm run build -w @open-antigravity/llm-gateway",
+    "build:shared": "npm run build -w @open-antigravity/shared",
+    "build:ide": "cd vscodium && bash build.sh",
+    "setup:ide": "cd vscodium && bash get_repo.sh && bash prepare_vscode.sh",
+    "test": "npm run test -w @open-antigravity/llm-gateway",
+    "lint": "eslint packages/*/src --ext .ts",
+    "lint:fix": "eslint packages/*/src --ext .ts --fix",
+    "format": "prettier --write \"packages/*/src/**/*.ts\"",
+    "clean": "rimraf packages/*/dist"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}
