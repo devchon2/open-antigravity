@@ -3,17 +3,20 @@
   "nameLong": "Open-Antigravity IDE",
   "applicationName": "open-antigravity",
   "dataFolderName": ".open-antigravity",
+  "win32MutexName": "openantigravity",
+  "licenseName": "MIT",
+  "licenseUrl": "https://github.com/devchon2/open-antigravity/blob/main/LICENSE",
+  "win32DirName": "Open-Antigravity",
+  "win32NameVersion": "Open-Antigravity",
+  "win32RegValueName": "OpenAntigravity",
+  "darwinBundleIdentifier": "com.openantigravity.ide",
+  "linuxIconName": "open-antigravity",
   "urlProtocol": "open-antigravity",
+  "telemetry": { "telemetryLevel": "off", "enableCrashReporter": false },
   "enableTelemetry": false,
-  "telemetry": {
-    "telemetryLevel": "off",
-    "enableCrashReporter": false
-  },
-  "builtInExtensions": [
-    {
-      "name": "open-antigravity.antigravity",
-      "version": "0.1.0",
-      "repo": "https://github.com/devchon2/open-antigravity"
-    }
-  ]
+  "aiConfig": { "ariaKey": "" },
+  "updateUrl": "https://github.com/devchon2/open-antigravity/releases",
+  "commit": "dev",
+  "quality": "stable",
+  "version": "0.2.0"
 }
