@@ -73,15 +73,15 @@ Antigravity forks the open-source VS Code foundation but radically alters the UX
 
 | Feature | Shortcut | Our impl | File |
 |---------|----------|----------|------|
-| Auto-complete | Tab | ❌ needs InlineCompletionItemProvider | — |
+| Auto-complete | Tab | ✅ InlineCompletionItemProvider | editor/inlineCompletionProvider.ts |
 | Tab to import | Tab | ❌ | — |
 | Tab to jump | Tab | ❌ | — |
-| Inline command | `Cmd+I` | ⚠️ input box, not inline UI | contribution.ts |
+| Inline command | `Cmd+I` | ✅ Cmd+I handler | editor/inlineCommands.ts |
 | Agent side panel | `Cmd+L` | ⚠️ concept only | — |
 | Toggle Editor↔Manager | `Cmd+E` | ⚠️ command exists | contribution.ts |
-| Explain and fix | Hover on problem | ❌ | — |
-| Send all to Agent | Problems panel | ❌ | — |
-| Send terminal output | Select + `Cmd+L` | ❌ | — |
+| Explain and fix | Hover on problem | ✅ problem scanner + agent prompt | editor/problemIntegration.ts |
+| Send all to Agent | Problems panel | ✅ buildSendAllPrompt() | editor/problemIntegration.ts |
+| Send terminal output | Select + `Cmd+L` | ✅ terminal → agent | editor/terminalIntegration.ts |
 
 ### Agent System
 
@@ -114,7 +114,7 @@ Antigravity forks the open-source VS Code foundation but radically alters the UX
 | Walkthroughs | artifactStore.create(type='walkthrough') | ✅ |
 | Code diffs | LCS-generated unified diff | ✅ |
 | Screenshots | Browser agent PNG capture | ✅ |
-| Browser recordings | Not yet | ❌ |
+| Browser recordings | ✅ frame capture at 10fps | browser/BrowserRecorder.ts |
 | Test results | Type exists | ⚠️ |
 | Google Docs-style comments | ArtifactComment[] | ✅ |
 
@@ -141,20 +141,21 @@ Antigravity forks the open-source VS Code foundation but radically alters the UX
 
 | Feature | Path | Status |
 |---------|------|--------|
-| Global rule | `~/.gemini/GEMINI.md` | ❌ |
-| Workspace rules | `.agent/rules/` | ❌ |
+| Global rule | `~/.open-antigravity/GEMINI.md` | ✅ RulesLoader.ts |
+| Workspace rules | `.open-antigravity/rules/` | ✅ RulesLoader.ts |
 
 ### Security / Policies
 
 | Policy | Modes | Status |
 |--------|-------|--------|
-| Terminal | Off / Auto / Turbo | ⚠️ Partial |
-| Review | Always Proceed / Agent Decides / Request Review | ⚠️ Partial |
-| Allow list | Positive security model | ⚠️ Config exists |
-| Deny list | Negative security model | ⚠️ Config exists |
-| JS execution | Always / Review / Disabled | ❌ |
-| Browser URL allowlist | Domain restrictions | ⚠️ Config exists |
-| 4 presets | Secure, Review-driven, Agent-driven, Custom | ❌ |
+| Terminal | Off / Auto / Turbo | ✅ security/policyPresets.ts |
+| Review | Always Proceed / Agent Decides / Request Review | ✅ security/policyPresets.ts |
+| Allow list | Positive security model | ✅ security/policyPresets.ts |
+| Deny list | Negative security model | ✅ security/policyPresets.ts |
+| JS execution | Always / Review / Disabled | ✅ security/policyPresets.ts |
+| Browser URL allowlist | Domain restrictions | ✅ security/policyPresets.ts |
+| 4 presets | Secure, Review-driven, Agent-driven, Custom | ✅ security/policyPresets.ts |
+| MCP server support | Local + remote MCP servers | ✅ mcp/mcpClient.ts |
 
 ### Data Storage Paths (Antigravity conventions)
 
