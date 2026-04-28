@@ -1,0 +1,19 @@
+{
+  "nameShort": "Open-Antigravity",
+  "nameLong": "Open-Antigravity IDE",
+  "applicationName": "open-antigravity",
+  "dataFolderName": ".open-antigravity",
+  "urlProtocol": "open-antigravity",
+  "enableTelemetry": false,
+  "telemetry": {
+    "telemetryLevel": "off",
+    "enableCrashReporter": false
+  },
+  "builtInExtensions": [
+    {
+      "name": "open-antigravity.antigravity",
+      "version": "0.1.0",
+      "repo": "https://github.com/devchon2/open-antigravity"
+    }
+  ]
+}
