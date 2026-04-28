@@ -93,6 +93,48 @@ open-antigravity/
 └── mitmserver/          # Original MITM proxy (legacy)
 ```
 
+## How It Works (Like Antigravity)
+
+Google's Antigravity forks VS Code and splits it into two windows: **Editor** (traditional code editing) and **Agent Manager** (Mission Control for orchestrating AI agents). Toggle between them with `Cmd+E`.
+
+```
+Editor View                         Agent Manager View
+┌──────────────────────────┐       ┌──────────────────────────┐
+│ File explorer, tabs      │ Cmd+E │ Inbox: conversation list │
+│ Code editor              │ ←───→ │ "Ask anything" input     │
+│ Terminal, debug, SCM     │       │ Agent cards (status)     │
+│ Agent panel (Cmd+L)      │       │ Artifacts toggle         │
+│ Inline commands (Cmd+I)  │       │ Model selector           │
+│ Tab autocomplete         │       │ Fast/Planning toggle     │
+│ Problems → Send to agent │       │ Workspace selector       │
+└──────────────────────────┘       └──────────────────────────┘
+```
+
+### Agent-First Workflow
+
+1. User describes a task in the Agent Manager
+2. Agent produces a **Task Plan** artifact (like Google Docs — commentable)
+3. Agent executes: reads files, writes code, runs terminal commands, opens browser
+4. Every file write shows a **diff** — Accept/Reject before applying
+5. Agent verifies (runs tests, takes screenshots)
+6. Agent produces a **Walkthrough** artifact summarizing everything
+7. User can **undo** any step via git stash checkpoints
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Multi-model** | OpenAI, Anthropic, Google, Ollama — unified API |
+| **Agent-first** | Plan → Approve → Execute → Verify → Walkthrough |
+| **Multi-agent** | Spawn coder, tester, reviewer in parallel |
+| **Artifacts** | Task lists, plans, diffs, screenshots, recordings |
+| **Progressive Disclosure** | Skills loaded only when matched (no context bloat) |
+| **Workflows** | /command saved prompts |
+| **Browser Subagent** | Playwright — blue border shows agent control |
+| **Approval** | Human-in-the-loop via QuickPick (Approve/Reject all) |
+| **Checkpoints** | Git stash snapshots for undo |
+| **Privacy** | Telemetry off, local-only mode |
+
 ## Key Design Decisions
 
 - **Not an extension.** The agent code lives in `src/vs/workbench/contrib/antigravity/` inside the VS Code source tree — registered via `IWorkbenchContributionsRegistry` at `LifecyclePhase.Restored`. This is how Antigravity itself works.
