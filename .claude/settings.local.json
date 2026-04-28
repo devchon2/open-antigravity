@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "WebSearch",
+      "WebFetch(domain:en.wikipedia.org)",
+      "WebFetch(domain:codelabs.developers.google.com)",
+      "WebFetch(domain:www.reddit.com)",
+      "Read(//c/Users/__TRACKED_VAR__/AppData/Local/Programs/**)",
+      "Read(//c/Program Files/Google/**)",
+      "Read(//c/Users/__TRACKED_VAR__/AppData/Local/**)",
+      "Read(//c/Program Files/**)",
+      "Bash(pwsh.exe -Command 'Get-ItemProperty HKLM:\\\\Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Uninstall\\\\* | Where-Object { $_.DisplayName -match '\\\\''antigravity'\\\\'' -or $_.DisplayName -match '\\\\''gravity'\\\\'' } | Select-Object DisplayName, InstallLocation, DisplayVersion')",
+      "Bash(pwsh.exe -Command 'Get-ItemProperty HKCU:\\\\Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Uninstall\\\\* | Where-Object { $_.DisplayName -match '\\\\''antigravity'\\\\'' -or $_.DisplayName -match '\\\\''gravity'\\\\'' } | Select-Object DisplayName, InstallLocation, DisplayVersion')",
+      "Bash(file \"/c/Users/informel-tic/AppData/Roaming/antigravity/Network/\"*)",
+      "Bash(grep -oP 'https://[a-zA-Z0-9.-]+\\\\.googleapis\\\\.com/[^\"'\\\\''\\\\s`\\\\]}]+' \"/c/Users/informel-tic/AppData/Local/Programs/Antigravity/resources/app/extensions/antigravity/dist/extension.js\")",
+      "Bash(python3 *)",
+      "Bash(node *)"
+    ]
+  }
+}
