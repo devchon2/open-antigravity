@@ -8,12 +8,14 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev:gateway & npm run dev:extension",
+    "dev": "npm run dev:gateway",
     "dev:gateway": "npm run dev -w @open-antigravity/llm-gateway",
-    "dev:extension": "npm run dev -w @open-antigravity/extension",
+    "dev:dashboard": "npm run dev -w @open-antigravity/dashboard 2>/dev/null || echo 'dashboard not in workspace'",
     "build": "npm run build:shared && npm run build:gateway",
     "build:gateway": "npm run build -w @open-antigravity/llm-gateway",
     "build:shared": "npm run build -w @open-antigravity/shared",
+    "build:ide": "cd vscodium && bash build.sh",
+    "setup:ide": "cd vscodium && bash get_repo.sh && bash prepare_vscode.sh",
     "test": "npm run test -w @open-antigravity/llm-gateway",
     "lint": "eslint packages/*/src --ext .ts",
     "lint:fix": "eslint packages/*/src --ext .ts --fix",
