@@ -1,6 +1,6 @@
 "use client";
 
-export function TopBar() {
+export function TopBar({ onInbox }: { onInbox?: () => void }) {
   return (
     <header className="h-11 border-b border-ag-border flex items-center px-4 gap-3 bg-ag-surface shrink-0">
       <div className="flex items-center gap-2">
@@ -8,6 +8,11 @@ export function TopBar() {
         <span className="font-semibold text-sm">Open-Antigravity</span>
       </div>
       <div className="flex-1" />
+      {onInbox && (
+        <button className="btn-ghost text-xs" title="Inbox" onClick={onInbox}>
+          Inbox
+        </button>
+      )}
       <button className="btn-ghost text-xs" title="Toggle Artifacts">
         Artifacts
       </button>

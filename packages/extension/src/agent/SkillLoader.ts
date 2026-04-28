@@ -21,14 +21,14 @@ export class SkillLoader {
     // Workspace skills
     const ws = vscode.workspace.workspaceFolders?.[0];
     if (ws) {
-      const wsSkillsPath = path.join(ws.uri.fsPath, '.antigravity', 'skills');
+      const wsSkillsPath = path.join(ws.uri.fsPath, '.agent', 'skills');
       await this.scanDirectory(wsSkillsPath, 'workspace');
     }
 
     // Global skills
     const home = process.env.HOME || process.env.USERPROFILE || '';
     if (home) {
-      const globalSkillsPath = path.join(home, '.antigravity', 'skills');
+      const globalSkillsPath = path.join(home, '.agent', 'skills');
       await this.scanDirectory(globalSkillsPath, 'global');
     }
   }
