@@ -1,7 +1,92 @@
-const { readFileSync, writeFileSync, mkdirSync, readdirSync } = require("fs");
-const { join, dirname, isAbsolute } = require("path");
-const { exec } = require("child_process");
-function rp(p:string):string{return isAbsolute(p)?p:join(process.cwd(),p)}
-export const TOOLS=[{function:{name:"read_file",description:"Read file.",parameters:{type:"object",properties:{path:{type:"string"}},required:["path"]}}},{function:{name:"write_file",description:"Write file.",parameters:{type:"object",properties:{path:{type:"string"},content:{type:"string"}},required:["path","content"]}}},{function:{name:"edit_file",description:"Edit file (exact string replace).",parameters:{type:"object",properties:{path:{type:"string"},old_string:{type:"string"},new_string:{type:"string"}},required:["path","old_string","new_string"]}}},{function:{name:"list_directory",description:"List directory.",parameters:{type:"object",properties:{path:{type:"string"}},required:[]}}},{function:{name:"execute_command",description:"Execute shell command.",parameters:{type:"object",properties:{command:{type:"string"},cwd:{type:"string"}},required:["command"]}}},{function:{name:"search_codebase",description:"Search with regex.",parameters:{type:"object",properties:{pattern:{type:"string"},path:{type:"string"}},required:["pattern"]}}},{function:{name:"browser_action",description:"Browser interaction.",parameters:{type:"object",properties:{action:{type:"string",enum:["navigate","click","type","screenshot","get_content"]},url:{type:"string"},selector:{type:"string"},text:{type:"string"}},required:["action"]}}}];
-export async function executeTool(n:string,a:Record<string,unknown>):Promise<{content?:string;error?:string}>{try{switch(n){case"read_file":return{content:readFileSync(rp(a.path as string),"utf-8")};case"write_file":{var fp=rp(a.path as string);mkdirSync(dirname(fp),{recursive:true});writeFileSync(fp,a.content as string,"utf-8");return{content:"Written: "+fp}}case"edit_file":{var fp=rp(a.path as string);var o=readFileSync(fp,"utf-8");var c=o.split(a.old_string as string).length-1;if(c===0)return{error:"old_string not found"};if(c>1)return{error:"Found "+c+" matches"};writeFileSync(fp,o.replace(a.old_string as string,a.new_string as string),"utf-8");return{content:"Edited: "+fp}}case"list_directory":{var dp=a.path?rp(a.path as string):process.cwd();return{content:readdirSync(dp,{withFileTypes:true}).map((e:any)=>e.isDirectory()?e.name+"/":e.name).join("
-")}}case"execute_command":return new Promise(function(r){exec(a.command as string,{cwd:a.cwd as string,timeout:30000,maxBuffer:10485760},function(e:any,o:string,s:string){r({content:o||s||"(empty)",error:e?e.message:void 0})})});case"search_codebase":return new Promise(function(r){var d=a.path?rp(a.path as string):process.cwd();var cmd=process.platform==="win32"?"findstr /s /i /n ""+a.pattern+"" ""+d+"*" 2>nul":"grep -rn ""+a.pattern+"" ""+d+"" 2>/dev/null";exec(cmd,{timeout:15000,maxBuffer:5242880,shell:true},function(e:any,o:string){r({content:o||"No matches"})})});case"browser_action":try{var mod=require("../browser/antigravityBrowserAgent.js");return{content:await new mod.AntigravityBrowserAgent().execute(a as any)}}catch(e:any){return{error:"Browser unavailable: "+e.message}}default:return{error:"Unknown tool: "+n}}}catch(e:any){return{error:e.message}}}
+const { readFileSync, writeFileSync, mkdirSync, readdirSync } = require('fs');
+const { join, dirname, isAbsolute } = require('path');
+const { exec } = require('child_process');
+
+function resolvePath(p: string): string {
+  return isAbsolute(p) ? p : join(process.cwd(), p);
+}
+
+export const TOOLS = [
+  { function: { name: 'read_file', description: 'Read file contents.', parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } } },
+  { function: { name: 'write_file', description: 'Write content to file.', parameters: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] } } },
+  { function: { name: 'edit_file', description: 'Replace exact string in file.', parameters: { type: 'object', properties: { path: { type: 'string' }, old_string: { type: 'string' }, new_string: { type: 'string' } }, required: ['path', 'old_string', 'new_string'] } } },
+  { function: { name: 'list_directory', description: 'List directory contents.', parameters: { type: 'object', properties: { path: { type: 'string' } }, required: [] } } },
+  { function: { name: 'execute_command', description: 'Execute shell command.', parameters: { type: 'object', properties: { command: { type: 'string' }, cwd: { type: 'string' } }, required: ['command'] } } },
+  { function: { name: 'search_codebase', description: 'Search workspace with regex.', parameters: { type: 'object', properties: { pattern: { type: 'string' }, path: { type: 'string' } }, required: ['pattern'] } } },
+  { function: { name: 'browser_action', description: 'Interact with web browser.', parameters: { type: 'object', properties: { action: { type: 'string', enum: ['navigate', 'click', 'type', 'screenshot', 'get_content'] }, url: { type: 'string' }, selector: { type: 'string' }, text: { type: 'string' } }, required: ['action'] } } },
+];
+
+export async function executeTool(
+  name: string,
+  args: Record<string, unknown>,
+): Promise<{ content?: string; error?: string }> {
+  try {
+    switch (name) {
+      case 'read_file':
+        return { content: readFileSync(resolvePath(args.path as string), 'utf-8') };
+
+      case 'write_file': {
+        const fp = resolvePath(args.path as string);
+        mkdirSync(dirname(fp), { recursive: true });
+        writeFileSync(fp, args.content as string, 'utf-8');
+        return { content: 'Written: ' + fp };
+      }
+
+      case 'edit_file': {
+        const fp = resolvePath(args.path as string);
+        const orig = readFileSync(fp, 'utf-8');
+        const count = orig.split(args.old_string as string).length - 1;
+        if (count === 0) return { error: 'old_string not found' };
+        if (count > 1) return { error: 'Found ' + count + ' matches — must be unique' };
+        writeFileSync(fp, orig.replace(args.old_string as string, args.new_string as string), 'utf-8');
+        return { content: 'Edited: ' + fp };
+      }
+
+      case 'list_directory': {
+        const dp = args.path ? resolvePath(args.path as string) : process.cwd();
+        return {
+          content: readdirSync(dp, { withFileTypes: true })
+            .map((e: any) => (e.isDirectory() ? e.name + '/' : e.name))
+            .join('\n'),
+        };
+      }
+
+      case 'execute_command':
+        return new Promise((resolve) =>
+          exec(
+            args.command as string,
+            { cwd: args.cwd as string, timeout: 30000, maxBuffer: 10 * 1024 * 1024 },
+            (e: any, stdout: string, stderr: string) =>
+              resolve({ content: stdout || stderr || '(empty)', error: e?.message }),
+          ),
+        );
+
+      case 'search_codebase':
+        return new Promise((resolve) => {
+          const dir = args.path ? resolvePath(args.path as string) : process.cwd();
+          const cmd =
+            process.platform === 'win32'
+              ? 'findstr /s /i /n "' + args.pattern + '" "' + dir + '\\*" 2>nul'
+              : 'grep -rn "' + args.pattern + '" "' + dir + '" 2>/dev/null';
+          exec(
+            cmd,
+            { timeout: 15000, maxBuffer: 5 * 1024 * 1024, shell: true },
+            (_e: any, stdout: string) => resolve({ content: stdout || 'No matches' }),
+          );
+        });
+
+      case 'browser_action':
+        try {
+          const mod = require('../browser/antigravityBrowserAgent.js');
+          return { content: await new mod.AntigravityBrowserAgent().execute(args as any) };
+        } catch (e: any) {
+          return { error: 'Browser unavailable: ' + e.message };
+        }
+
+      default:
+        return { error: 'Unknown tool: ' + name };
+    }
+  } catch (e: any) {
+    return { error: e.message };
+  }
+}
