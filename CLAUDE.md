@@ -29,7 +29,7 @@ curl http://localhost:4001/api/models  # -> list of available models
 
 ### Three layers
 
-1. **`vscodium/`** — The IDE. Contains `antigravity-src/vs/workbench/contrib/antigravity/` which gets copied INTO a VSCodium checkout by `prepare_vscode.sh`. The antigravity code becomes a native workbench contribution registered via `IWorkbenchContributionsRegistry` at `LifecyclePhase.Restored`. No extension APIs are used — all VS Code internal APIs (DI, services, workbench).
+1. **`vscodium/`** — The IDE. Contains `open-antigravity-src/vs/workbench/contrib/open-antigravity/` which gets copied INTO a VSCodium checkout by `prepare_vscode.sh`. The antigravity code becomes a native workbench contribution registered via `IWorkbenchContributionsRegistry` at `LifecyclePhase.Restored`. No extension APIs are used — all VS Code internal APIs (DI, services, workbench).
 
 2. **`packages/llm-gateway/`** — Standalone Fastify backend. Provider pattern: each model provider is a plain object implementing `LLMProvider { name, providerId, isAvailable(), listModels(), chat() }`. Providers registered in `registry.ts`. Streaming uses SSE over raw HTTP. Auth middleware skips on `/api/health` and allows localhost without token when `GATEWAY_API_KEY` is the default `antigravity-local-dev-key`.
 
@@ -37,17 +37,17 @@ curl http://localhost:4001/api/models  # -> list of available models
 
 ### Key design decisions
 
-- **No extension ever.** The `packages/extension/` directory was intentionally removed. All agent features live at `vscodium/antigravity-src/vs/workbench/contrib/antigravity/` and are compiled as part of VSCodium's gulp build. The `prepare_vscode.sh` script registers them in `contributions.all.ts`.
+- **No extension ever.** The `packages/extension/` directory was intentionally removed. All agent features live at `vscodium/open-antigravity-src/vs/workbench/contrib/open-antigravity/` and are compiled as part of VSCodium's gulp build. The `prepare_vscode.sh` script registers them in `contributions.all.ts`.
 
-- **Agent loop**: `AntigravityAgentEngine.run()` uses a `while(continueLoop)` pattern that handles multi-level tool calls. Each tool execution's result is sent back to the model, and further tool calls are caught in the outer loop.
+- **Agent loop**: `AgentEngine.run()` uses a `while(continueLoop)` pattern that handles multi-level tool calls. Each tool execution's result is sent back to the model, and further tool calls are caught in the outer loop.
 
-- **Progressive disclosure**: `AntigravitySkillLoader` scans `.antigravity/skills/<name>/SKILL.md` files. Only metadata (name, description) is loaded at startup. Full instructions are injected into the system prompt only when a user request matches the skill's description via keyword matching.
+- **Progressive disclosure**: `SkillLoader` scans `.open-antigravity/skills/<name>/SKILL.md` files. Only metadata (name, description) is loaded at startup. Full instructions are injected into the system prompt only when a user request matches the skill's description via keyword matching.
 
 - **Approval**: Uses `vscode.window.showQuickPick(['Approve', 'Reject', 'Approve all'])` for file writes, terminal commands, and browser actions. Not a custom webview — uses native VS Code UI.
 
-- **Browser subagent**: `AntigravityBrowserAgent` wraps Playwright. Injects CSS `body { border: 3px solid #58a6ff }` to show the blue border indicating agent control (matching Antigravity's UX). Playwright is dynamically imported (not a hard dependency).
+- **Browser subagent**: `BrowserAgent` wraps Playwright. Injects CSS `body { border: 3px solid #58a6ff }` to show the blue border indicating agent control (matching Antigravity's UX). Playwright is dynamically imported (not a hard dependency).
 
-- **Artifact persistence**: JSON in `.antigravity/artifacts.json` at the workspace root. Google Docs-style comments stored as `ArtifactComment[]` on each artifact.
+- **Artifact persistence**: JSON in `.open-antigravity/artifacts.json` at the workspace root. Google Docs-style comments stored as `ArtifactComment[]` on each artifact.
 
 ## Antigravity Feature Parity
 
@@ -87,10 +87,10 @@ Antigravity forks the open-source VS Code foundation but radically alters the UX
 
 | Feature | Our impl | File |
 |---------|----------|------|
-| AgentEngine (Plan→Approve→Execute→Verify) | ✅ | agent/antigravityAgentEngine.ts |
-| Multi-agent (spawn coder/tester/reviewer) | ✅ | agent/antigravityAgentManager.ts |
-| Tool system (7 tools) | ✅ | tools/antigravityTools.ts |
-| Approval (QuickPick: Approve/Reject/Approve all) | ✅ | agent/antigravityAgentEngine.ts |
+| AgentEngine (Plan→Approve→Execute→Verify) | ✅ | agent/AgentEngine.ts |
+| Multi-agent (spawn coder/tester/reviewer) | ✅ | agent/AgentManager.ts |
+| Tool system (7 tools) | ✅ | tools/Tools.ts |
+| Approval (QuickPick: Approve/Reject/Approve all) | ✅ | agent/AgentEngine.ts |
 | Checkpoints (git stash undo) | ✅ | workspace/CheckpointManager.ts |
 | Diff generation (LCS unified diff) | ✅ | diffs/DiffManager.ts |
 
@@ -122,8 +122,8 @@ Antigravity forks the open-source VS Code foundation but radically alters the UX
 
 | Feature | Path | Status |
 |---------|------|--------|
-| SKILL.md (YAML frontmatter) | `.antigravity/skills/<name>/SKILL.md` | ✅ |
-| Global scope | `~/.antigravity/skills/` | ✅ |
+| SKILL.md (YAML frontmatter) | `.open-antigravity/skills/<name>/SKILL.md` | ✅ |
+| Global scope | `~/.open-antigravity/skills/` | ✅ |
 | Workspace scope | `<workspace>/.agent/skills/` | ✅ |
 | scripts/ optional dir | For Python/Bash execution | ❌ |
 | references/ optional dir | Docs, templates | ❌ |
@@ -134,8 +134,8 @@ Antigravity forks the open-source VS Code foundation but radically alters the UX
 | Feature | Path | Status |
 |---------|------|--------|
 | /command triggers | `/` in chat | ✅ |
-| Saved prompts (.md) | `.antigravity/workflows/<name>.md` | ✅ |
-| Global + Workspace | `~/.antigravity/workflows/` + workspace | ✅ |
+| Saved prompts (.md) | `.open-antigravity/workflows/<name>.md` | ✅ |
+| Global + Workspace | `~/.open-antigravity/workflows/` + workspace | ✅ |
 
 ### Rules (Always-On System Instructions)
 
@@ -168,7 +168,7 @@ Antigravity forks the open-source VS Code foundation but radically alters the UX
 | Workspace skills | `<workspace>/.agent/skills/` |
 | MCP config | `$HOME/.gemini/antigravity/mcp_config.json` |
 | Browser allowlist | `$HOME/.gemini/antigravity/browserAllowlist.txt` |
-| Our artifacts | `<workspace>/.antigravity/artifacts.json` |
+| Our artifacts | `<workspace>/.open-antigravity/artifacts.json` |
 
 ### Remote
 

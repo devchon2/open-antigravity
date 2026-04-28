@@ -4,15 +4,15 @@
  *  Powers the Mission Control dashboard.
  *--------------------------------------------------------------------------------------------*/
 
-import { AntigravityAgentEngine } from './antigravityAgentEngine.js';
+import { AgentEngine } from './AgentEngine.js';
 
 export interface AgentInstance {
   id: string; name: string; role: 'coder' | 'tester' | 'reviewer' | 'planner' | 'general';
-  model: string; status: string; engine: AntigravityAgentEngine;
+  model: string; status: string; engine: AgentEngine;
   currentTask?: string; createdAt: string;
 }
 
-export class AntigravityAgentManager {
+export class AgentManager {
   private agents: Map<string, AgentInstance> = new Map();
 
   spawn(name: string, role: AgentInstance['role'] = 'general', model?: string): AgentInstance {
@@ -22,7 +22,7 @@ export class AntigravityAgentManager {
       role,
       model: model || 'gpt-4o',
       status: 'idle',
-      engine: new AntigravityAgentEngine(model || 'gpt-4o'),
+      engine: new AgentEngine(model || 'gpt-4o'),
       createdAt: new Date().toISOString(),
     };
     this.agents.set(inst.id, inst);

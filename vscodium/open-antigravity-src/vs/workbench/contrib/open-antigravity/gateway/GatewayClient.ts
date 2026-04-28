@@ -1,13 +1,13 @@
 /*---------------------------------------------------------------------------------------------
- *  Open-Antigravity Gateway Client
- *  SSE streaming client to the Open-Antigravity LLM Gateway (Fastify backend).
+ *  Open-Gateway Client
+ *  SSE streaming client to the Open-LLM Gateway (Fastify backend).
  *--------------------------------------------------------------------------------------------*/
 
 export interface GatewayModel {
   id: string; name: string; provider: string;
 }
 
-export class AntigravityGatewayClient {
+export class GatewayClient {
   constructor(
     private baseUrl: string = 'http://localhost:4001',
     private apiKey: string = 'antigravity-local-dev-key',

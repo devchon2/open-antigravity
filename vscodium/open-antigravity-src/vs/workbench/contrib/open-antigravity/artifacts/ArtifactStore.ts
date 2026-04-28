@@ -1,7 +1,7 @@
 /*---------------------------------------------------------------------------------------------
- *  Open-Antigravity Artifact Store
+ *  Open-Artifact Store
  *  Persistent storage for agent artifacts (plans, diffs, screenshots, walkthroughs).
- *  Persists to .antigravity/artifacts.json in the workspace root.
+ *  Persists to .open-antigravity/artifacts.json in the workspace root.
  *--------------------------------------------------------------------------------------------*/
 
 export type ArtifactType = 'task_list' | 'plan' | 'diff' | 'screenshot' | 'browser_recording' | 'walkthrough' | 'test_result';
@@ -17,7 +17,7 @@ export interface Artifact {
   createdAt: string; updatedAt: string;
 }
 
-export class AntigravityArtifactStore {
+export class ArtifactStore {
   private artifacts: Map<string, Artifact> = new Map();
 
   create(agentId: string, type: ArtifactType, title: string, content: string, status: ArtifactStatus = 'pending'): Artifact {

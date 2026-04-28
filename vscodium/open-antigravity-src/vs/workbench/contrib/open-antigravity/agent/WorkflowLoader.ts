@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Open-Antigravity Workflow Loader — Saved Prompts (/commands)
- *  Scans .antigravity/workflows/ in workspace + ~/.antigravity/workflows/ globally.
+ *  Open-Workflow Loader — Saved Prompts (/commands)
+ *  Scans .open-antigravity/workflows/ in workspace + ~/.open-antigravity/workflows/ globally.
  *  Workflows are .md files triggered by /name in the agent chat.
  *--------------------------------------------------------------------------------------------*/
 
@@ -8,7 +8,7 @@ export interface Workflow {
   name: string; description: string; prompt: string; scope: 'global' | 'workspace';
 }
 
-export class AntigravityWorkflowLoader {
+export class WorkflowLoader {
   private workflows: Workflow[] = [];
 
   async scan(): Promise<void> {
@@ -16,8 +16,8 @@ export class AntigravityWorkflowLoader {
     try {
       const { homedir } = require('os');
       const ws = process.cwd();
-      await this.scanDir(ws + '/.antigravity/workflows', 'workspace');
-      await this.scanDir(homedir() + '/.antigravity/workflows', 'global');
+      await this.scanDir(ws + '/.open-antigravity/workflows', 'workspace');
+      await this.scanDir(homedir() + '/.open-antigravity/workflows', 'global');
     } catch {}
   }
 

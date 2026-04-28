@@ -140,12 +140,12 @@ A key differentiator. When the main agent needs browser interaction:
 
 ### Architecture
 
-We fork VSCodium (not VS Code) because it's MIT-licensed without Microsoft branding/telemetry. The agent system is integrated directly into `src/vs/workbench/contrib/antigravity/` — the same location pattern Google uses for Antigravity in VS Code's workbench.
+We fork VSCodium (not VS Code) because it's MIT-licensed without Microsoft branding/telemetry. The agent system is integrated directly into `src/vs/workbench/contrib/open-antigravity/` — the same location pattern Google uses for Antigravity in VS Code's workbench.
 
 ```
 vscodium/
-├── antigravity-src/vs/workbench/contrib/antigravity/
-│   ├── antigravity.contribution.ts     # DI lifecycle (LifecyclePhase.Restored)
+├── open-antigravity-src/vs/workbench/contrib/open-antigravity/
+│   ├── contribution.ts     # DI lifecycle (LifecyclePhase.Restored)
 │   ├── agent/                          # AgentEngine, AgentManager, SkillLoader, WorkflowLoader
 │   ├── tools/                          # 7 tools (file, terminal, search, browser)
 │   ├── artifacts/                      # ArtifactStore (CRUD + persistence)

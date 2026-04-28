@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Open-Antigravity Skill Loader — Progressive Disclosure
- *  Scans .antigravity/skills/ in workspace + ~/.antigravity/skills/ globally.
+ *  Open-Skill Loader — Progressive Disclosure
+ *  Scans .open-antigravity/skills/ in workspace + ~/.open-antigravity/skills/ globally.
  *  Skills are only loaded into context when the user request matches the skill description.
  *--------------------------------------------------------------------------------------------*/
 
@@ -9,7 +9,7 @@ export interface Skill {
   scope: 'global' | 'workspace'; path: string;
 }
 
-export class AntigravitySkillLoader {
+export class SkillLoader {
   private skills: Skill[] = [];
   private loaded: Set<string> = new Set();
 
@@ -18,8 +18,8 @@ export class AntigravitySkillLoader {
     try {
       const { homedir } = require('os');
       const ws = process.cwd();
-      await this.scanDir(ws + '/.antigravity/skills', 'workspace');
-      await this.scanDir(homedir() + '/.antigravity/skills', 'global');
+      await this.scanDir(ws + '/.open-antigravity/skills', 'workspace');
+      await this.scanDir(homedir() + '/.open-antigravity/skills', 'global');
     } catch { /* silently skip if dirs don't exist */ }
   }
 

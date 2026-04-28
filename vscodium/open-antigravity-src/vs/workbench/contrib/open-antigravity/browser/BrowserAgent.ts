@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Open-Antigravity Browser Agent — Playwright Subagent
- *  Navigate, click, type, screenshot. Injects blue border (Antigravity UX).
+ *  Open-Browser Agent — Playwright Subagent
+ *  Navigate, click, type, screenshot. Injects blue border (UX).
  *--------------------------------------------------------------------------------------------*/
 
 interface BrowserAction {
@@ -8,7 +8,7 @@ interface BrowserAction {
   url?: string; selector?: string; text?: string; amount?: number;
 }
 
-export class AntigravityBrowserAgent {
+export class BrowserAgent {
   private browserProcess: any = null;
   private isActive = false;
 
@@ -18,7 +18,7 @@ export class AntigravityBrowserAgent {
     const context = await this.browserProcess.newContext({ viewport: { width: 1280, height: 720 } });
     const page = await context.newPage();
 
-    // Blue border = agent control (matching Antigravity UX)
+    // Blue border = agent control (matching UX)
     await page.addStyleTag({
       content: 'body { border: 3px solid #58a6ff !important; box-shadow: 0 0 20px rgba(88,166,255,0.3) !important; }',
     });

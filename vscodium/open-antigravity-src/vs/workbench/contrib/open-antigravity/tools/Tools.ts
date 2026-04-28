@@ -77,8 +77,8 @@ export async function executeTool(
 
       case 'browser_action':
         try {
-          const mod = require('../browser/antigravityBrowserAgent.js');
-          return { content: await new mod.AntigravityBrowserAgent().execute(args as any) };
+          const mod = require('../browser/BrowserAgent.js');
+          return { content: await new mod.BrowserAgent().execute(args as any) };
         } catch (e: any) {
           return { error: 'Browser unavailable: ' + e.message };
         }

@@ -1,5 +1,5 @@
 /*---------------------------------------------------------------------------------------------
- *  Open-Antigravity IDE — built INTO VSCodium (not an extension)
+ *  Open-IDE — built INTO VSCodium (not an extension)
  *  Main workbench contribution. Registers the agent system via VSCodium's DI lifecycle.
  *--------------------------------------------------------------------------------------------*/
 
@@ -10,7 +10,7 @@ import { Disposable } from '../../../../base/common/lifecycle.js';
 import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 
-class AntigravityContribution extends Disposable {
+class OpenAntigravityContribution extends Disposable {
 
   constructor(
     @IInstantiationService private readonly instantiationService: IInstantiationService,
@@ -23,10 +23,10 @@ class AntigravityContribution extends Disposable {
 
   private async init(): Promise<void> {
     // Progressive disclosure: scan skills and workflows at startup
-    const { AntigravitySkillLoader } = await import('../antigravity/agent/antigravitySkillLoader.js');
-    const { AntigravityWorkflowLoader } = await import('../antigravity/agent/antigravityWorkflowLoader.js');
-    const skills = new AntigravitySkillLoader();
-    const workflows = new AntigravityWorkflowLoader();
+    const { SkillLoader } = await import('../open-antigravity/agent/SkillLoader.js');
+    const { WorkflowLoader } = await import('../open-antigravity/agent/WorkflowLoader.js');
+    const skills = new SkillLoader();
+    const workflows = new WorkflowLoader();
     await skills.scan();
     await workflows.scan();
     console.log(
@@ -36,6 +36,6 @@ class AntigravityContribution extends Disposable {
 }
 
 Registry.as<IWorkbenchContributionsRegistry>(Extensions.Workbench).registerWorkbenchContribution(
-  AntigravityContribution,
+  OpenAntigravityContribution,
   LifecyclePhase.Restored,
 );

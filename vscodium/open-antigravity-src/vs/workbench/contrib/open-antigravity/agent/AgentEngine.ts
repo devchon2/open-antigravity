@@ -1,7 +1,7 @@
 /*---------------------------------------------------------------------------------------------
- *  Open-Antigravity Agent Engine
+ *  Open-Agent Engine
  *  Plan -> Approve -> Execute -> Verify loop. Integrated into VSCodium workbench.
- *  Communicates with Open-Antigravity LLM Gateway (default: localhost:4001).
+ *  Communicates with Open-LLM Gateway (default: localhost:4001).
  *--------------------------------------------------------------------------------------------*/
 
 import { Emitter, Event } from '../../../../../base/common/event.js';
@@ -22,7 +22,7 @@ interface StreamChunk {
   toolCall?: { id: string; type: 'function'; function: { name: string; arguments: string } };
 }
 
-const SYSTEM_PROMPT = `You are an autonomous coding agent inside Open-Antigravity IDE.
+const SYSTEM_PROMPT = `You are an autonomous coding agent inside Open-IDE.
 ## Capabilities
 - Read, write, edit files (exact string replacement)
 - Execute terminal commands
@@ -37,7 +37,7 @@ const SYSTEM_PROMPT = `You are an autonomous coding agent inside Open-Antigravit
 4. Verify changes by running tests
 5. Present results clearly with diffs and explanations`;
 
-export class AntigravityAgentEngine {
+export class AgentEngine {
   private _status: AgentStatus = 'idle';
   private messages: ChatMessage[] = [];
   private model: string;
@@ -193,8 +193,8 @@ export class AntigravityAgentEngine {
           });
         case 'browser_action': {
           try {
-            const { AntigravityBrowserAgent } = await import('../antigravity/browser/antigravityBrowserAgent.js');
-            return { content: await new AntigravityBrowserAgent().execute(args as any) };
+            const { BrowserAgent } = await import('../open-antigravity/browser/BrowserAgent.js');
+            return { content: await new BrowserAgent().execute(args as any) };
           } catch (e: any) { return { error: 'Browser unavailable: ' + e.message }; }
         }
         default: return { error: 'Unknown tool: ' + name };
