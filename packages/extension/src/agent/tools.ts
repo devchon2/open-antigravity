@@ -1,168 +1,133 @@
-﻿import * as vscode from 'vscode';
-import * as path from 'path';
+import * as vscode from 'vscode';
+import * as cp from 'child_process';
 import * as fs from 'fs';
+import * as path from 'path';
+
+export interface ToolDefinition {
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
 
 export interface ToolResult {
-  toolCallId: string;
   content: string;
   error?: string;
 }
 
-export const TOOL_DEFINITIONS = [
+export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
-    type: 'function' as const,
     function: {
       name: 'read_file',
-      description: 'Read the contents of a file',
+      description: 'Read the contents of a file.',
       parameters: {
         type: 'object',
-        properties: {
-          path: { type: 'string', description: 'File path relative to workspace root' },
-        },
+        properties: { path: { type: 'string', description: 'File path.' } },
         required: ['path'],
       },
     },
   },
   {
-    type: 'function' as const,
     function: {
       name: 'write_file',
-      description: 'Write content to a file, creating it if needed',
+      description: 'Write content to a file.',
       parameters: {
         type: 'object',
         properties: {
-          path: { type: 'string', description: 'File path relative to workspace root' },
-          content: { type: 'string', description: 'Content to write' },
+          path: { type: 'string', description: 'File path.' },
+          content: { type: 'string', description: 'Content.' },
         },
         required: ['path', 'content'],
       },
     },
   },
   {
-    type: 'function' as const,
     function: {
-      name: 'edit_file',
-      description: 'Find and replace text in a file using exact string match',
+      name: 'list_directory',
+      description: 'List directory contents.',
       parameters: {
         type: 'object',
-        properties: {
-          path: { type: 'string', description: 'File path relative to workspace root' },
-          old_string: { type: 'string', description: 'Exact string to find' },
-          new_string: { type: 'string', description: 'Replacement string' },
-        },
-        required: ['path', 'old_string', 'new_string'],
+        properties: { path: { type: 'string', description: 'Directory path.' } },
+        required: [],
       },
     },
   },
   {
-    type: 'function' as const,
     function: {
       name: 'execute_command',
-      description: 'Execute a shell command',
+      description: 'Execute a shell command.',
       parameters: {
         type: 'object',
         properties: {
-          command: { type: 'string', description: 'Command to execute' },
-          cwd: { type: 'string', description: 'Working directory' },
+          command: { type: 'string', description: 'Command.' },
+          cwd: { type: 'string', description: 'Working directory.' },
         },
         required: ['command'],
       },
     },
   },
   {
-    type: 'function' as const,
     function: {
       name: 'search_codebase',
-      description: 'Search for a regex pattern in workspace files',
+      description: 'Search workspace files.',
       parameters: {
         type: 'object',
         properties: {
-          pattern: { type: 'string', description: 'Regex pattern to search for' },
-          path: { type: 'string', description: 'Directory to search in (defaults to workspace root)' },
+          pattern: { type: 'string', description: 'Regex pattern.' },
+          path: { type: 'string', description: 'Directory.' },
         },
         required: ['pattern'],
       },
     },
   },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'list_directory',
-      description: 'List files and folders in a directory',
-      parameters: {
-        type: 'object',
-        properties: {
-          path: { type: 'string', description: 'Directory path (defaults to workspace root)' },
-        },
-        required: [],
-      },
-    },
-  },
 ];
 
-function workspaceRoot(): string {
-  const folders = vscode.workspace.workspaceFolders;
-  if (!folders || !folders.length) return process.cwd();
-  return folders[0].uri.fsPath;
-}
-
-function resolvePath(p: string): string {
-  if (path.isAbsolute(p)) return p;
-  return path.join(workspaceRoot(), p);
+function resolvePath(inputPath: string): string {
+  if (path.isAbsolute(inputPath)) return inputPath;
+  const ws = vscode.workspace.workspaceFolders?.[0];
+  return ws ? path.join(ws.uri.fsPath, inputPath) : inputPath;
 }
 
 export async function executeTool(name: string, args: Record<string, unknown>): Promise<ToolResult> {
   try {
     switch (name) {
       case 'read_file': {
-        const filePath = resolvePath(args.path as string);
-        const content = fs.readFileSync(filePath, 'utf8');
-        return { toolCallId: '', content: `File: ${filePath}\n\`\`\`\n${content.slice(0, 50000)}\n\`\`\`${content.length > 50000 ? '\n... (truncated)' : ''}` };
+        const fp = resolvePath(args.path as string);
+        const content = fs.readFileSync(fp, 'utf-8');
+        return { content };
       }
       case 'write_file': {
-        const filePath = resolvePath(args.path as string);
-        const dir = path.dirname(filePath);
-        fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(filePath, args.content as string, 'utf8');
-        return { toolCallId: '', content: `File written: ${filePath}` };
-      }
-      case 'edit_file': {
-        const filePath = resolvePath(args.path as string);
-        const original = fs.readFileSync(filePath, 'utf8');
-        const oldStr = args.old_string as string;
-        if (!original.includes(oldStr)) {
-          return { toolCallId: '', error: 'old_string not found in file. Make sure to match exactly including whitespace.', content: '' };
-        }
-        const updated = original.replace(oldStr, args.new_string as string);
-        fs.writeFileSync(filePath, updated, 'utf8');
-        return { toolCallId: '', content: `Applied edit to ${filePath}. Lines changed.` };
-      }
-      case 'execute_command': {
-        const { execSync } = require('child_process');
-        const cwd = args.cwd ? resolvePath(args.cwd as string) : workspaceRoot();
-        const output = execSync(args.command as string, { cwd, encoding: 'utf8', timeout: 30000, maxBuffer: 1024 * 1024 });
-        return { toolCallId: '', content: output || '(no output)' };
-      }
-      case 'search_codebase': {
-        const { execSync } = require('child_process');
-        const cwd = args.path ? resolvePath(args.path as string) : workspaceRoot();
-        const output = execSync(`rg --no-heading -n "${args.pattern}" "${cwd}"`, { cwd, encoding: 'utf8', timeout: 30000, maxBuffer: 1024 * 1024 });
-        return { toolCallId: '', content: output.slice(0, 50000) || 'No matches found' };
+        const fp = resolvePath(args.path as string);
+        fs.mkdirSync(path.dirname(fp), { recursive: true });
+        fs.writeFileSync(fp, args.content as string, 'utf-8');
+        return { content: 'File written: ' + fp };
       }
       case 'list_directory': {
-        const dirPath = args.path ? resolvePath(args.path as string) : workspaceRoot();
-        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-        const listing = entries.map((e) => `${e.isDirectory() ? '📁' : '📄'} ${e.name}`).join('\n');
-        return { toolCallId: '', content: `Directory: ${dirPath}\n${listing}` };
+        const dp = args.path ? resolvePath(args.path as string) : (vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '.');
+        const entries = fs.readdirSync(dp, { withFileTypes: true });
+        return { content: entries.map((e) => (e.isDirectory() ? e.name + '/' : e.name)).join('\n') };
+      }
+      case 'execute_command': {
+        const cwd = args.cwd ? resolvePath(args.cwd as string) : undefined;
+        return new Promise((resolve) => {
+          cp.exec(args.command as string, { cwd, maxBuffer: 10 * 1024 * 1024, timeout: 30000 }, (_err, stdout, stderr) => {
+            resolve({ content: stdout || stderr || '(empty)', error: _err?.message });
+          });
+        });
+      }
+      case 'search_codebase': {
+        const dir = args.path ? resolvePath(args.path as string) : (vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '.');
+        return new Promise((resolve) => {
+          cp.exec('grep -rn ' + JSON.stringify(args.pattern) + ' ' + JSON.stringify(dir), { timeout: 10000 }, (_err, stdout) => {
+            resolve({ content: stdout || 'No matches' });
+          });
+        });
       }
       default:
-        return { toolCallId: '', error: `Unknown tool: ${name}`, content: '' };
+        return { content: '', error: 'Unknown tool: ' + name };
     }
   } catch (err: unknown) {
-    return {
-      toolCallId: '',
-      error: err instanceof Error ? err.message : String(err),
-      content: '',
-    };
+    return { content: '', error: err instanceof Error ? err.message : String(err) };
   }
 }

@@ -112,6 +112,24 @@
           "default": "fast",
           "enum": ["fast", "planning"],
           "description": "Agent mode: fast (direct execution) or planning (plan before acting)"
+        },
+        "open-antigravity.approvalMode": {
+          "type": "string",
+          "default": "always",
+          "enum": ["always", "never", "agent_decides"],
+          "description": "Approval mode: always (ask before every action), never (auto-approve), agent_decides (agent chooses)"
+        },
+        "open-antigravity.terminalAllowList": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["npm test", "npm run", "git status", "git diff", "ls", "dir", "cat", "echo"],
+          "description": "Commands allowed without approval"
+        },
+        "open-antigravity.terminalDenyList": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["rm -rf /", "sudo", "git push --force", "shutdown", "reboot"],
+          "description": "Commands always blocked"
         }
       }
     }

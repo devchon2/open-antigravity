@@ -1,7 +1,11 @@
-﻿import * as vscode from 'vscode';
+import * as vscode from 'vscode';
 import { streamChat } from '../services/gateway.js';
 import { executeTool, TOOL_DEFINITIONS } from './tools.js';
 import { SYSTEM_PROMPT, PLANNING_MODE_PROMPT, FAST_MODE_PROMPT } from '@open-antigravity/shared';
+import { diffManager } from '../diffs/DiffManager.js';
+import { approvalManager } from '../approval/ApprovalManager.js';
+import { checkpointManager } from '../workspace/CheckpointManager.js';
+import { artifactStore } from '../artifacts/ArtifactStore.js';
 
 export interface AgentMessage {
   role: 'user' | 'assistant' | 'system' | 'tool';
@@ -17,6 +21,7 @@ export interface AgentMessage {
 export class AgentEngine {
   private messages: AgentMessage[] = [];
   private model: string;
+  private runId: string = '';
 
   constructor(model: string) {
     this.model = model;
@@ -24,6 +29,9 @@ export class AgentEngine {
 
   reset(): void {
     this.messages = [];
+    this.runId = '';
+    diffManager.clear();
+    checkpointManager.clear();
   }
 
   getConversation(): AgentMessage[] {
@@ -33,6 +41,11 @@ export class AgentEngine {
   async *run(userMessage: string, mode: 'fast' | 'planning' = 'fast'): AsyncIterable<string> {
     const config = vscode.workspace.getConfiguration('open-antigravity');
     this.model = config.get<string>('defaultModel', 'gpt-4o');
+    this.runId = crypto.randomUUID();
+
+    // Configure approval based on mode
+    const approvalMode = config.get<string>('approvalMode', 'always');
+    approvalManager.setAutoApprove(mode === 'fast' && approvalMode === 'never');
 
     let systemPrompt = SYSTEM_PROMPT;
     if (mode === 'planning') {
@@ -44,9 +57,19 @@ export class AgentEngine {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (workspaceFolders && workspaceFolders.length) {
       systemPrompt += `\n\n## Current Workspace\nRoot: ${workspaceFolders[0].uri.fsPath}`;
+      systemPrompt += `\n\n## Available Tools\n${TOOL_DEFINITIONS.map((t) => `- ${t.function.name}: ${t.function.description}`).join('\n')}`;
     }
 
     this.messages.push({ role: 'user', content: userMessage });
+
+    // Create task list artifact in planning mode
+    if (mode === 'planning') {
+      artifactStore.create(this.runId, 'plan', 'Implementation Plan', userMessage, 'pending');
+      yield '\n📋 **Plan created.** Review in Artifacts panel.\n';
+    }
+
+    // Create checkpoint before execution
+    await checkpointManager.create(`before: ${userMessage.slice(0, 50)}`);
 
     const gatewayMessages = this.messages.map((m) => ({
       role: m.role,
@@ -60,6 +83,8 @@ export class AgentEngine {
     }));
 
     let fullResponse = '';
+    let toolIteration = 0;
+    const MAX_TOOL_ITERATIONS = 10;
 
     for await (const chunk of streamChat(this.model, gatewayMessages as any[], systemPrompt)) {
       if (chunk.type === 'text' && chunk.content) {
@@ -68,9 +93,53 @@ export class AgentEngine {
       }
 
       if (chunk.type === 'tool_call' && chunk.toolCall) {
-        yield '\n\n**Tool:** ' + (chunk.toolCall as any).function.name + '\n';
+        if (++toolIteration > MAX_TOOL_ITERATIONS) {
+          yield '\n\n⚠️ Max tool iterations reached.\n';
+          break;
+        }
 
-        const tc = chunk.toolCall as { id: string; type: 'function'; function: { name: string; arguments: string } };
+        const tc = chunk.toolCall as {
+          id: string;
+          type: 'function';
+          function: { name: string; arguments: string };
+        };
+
+        yield `\n\n🔧 **Executing:** \`${tc.function.name}\`\n`;
+
+        // Request approval for write/execute operations
+        const needsApproval = ['write_file', 'execute_command', 'browser_action'].includes(tc.function.name);
+        let approved = !needsApproval;
+
+        if (needsApproval) {
+          const args = JSON.parse(tc.function.arguments);
+          const desc = tc.function.name === 'execute_command'
+            ? `Command: ${args.command}`
+            : `Write to: ${args.path}`;
+
+          approved = await approvalManager.requestApproval(
+            tc.function.name === 'execute_command' ? 'command_exec' : 'file_write',
+            `Agent wants to ${tc.function.name}`,
+            desc,
+            tc.function.name === 'write_file' ? args.content?.slice(0, 500) : undefined,
+            { toolCall: tc },
+          );
+
+          if (!approved) {
+            yield '\n⛔ **Rejected** by user.\n';
+            this.messages.push({
+              role: 'assistant',
+              content: null,
+              toolCalls: [tc],
+            });
+            this.messages.push({
+              role: 'tool',
+              toolCallId: tc.id,
+              content: 'User rejected this operation.',
+            });
+            continue;
+          }
+        }
+
         const args = JSON.parse(tc.function.arguments);
         const result = await executeTool(tc.function.name, args);
 
@@ -85,9 +154,24 @@ export class AgentEngine {
           content: result.error || result.content,
         });
 
-        yield result.error ? `\n⚠️ ${result.error}\n` : `\n✅ Done\n`;
+        if (result.error) {
+          yield `\n⚠️ **Error:** ${result.error}\n`;
+        } else {
+          yield `\n✅ **Done**\n`;
+        }
 
-        // Recurse: send the tool result back to the model for continuation
+        // Show diff for file writes + create artifact
+        if (tc.function.name === 'write_file' && !result.error) {
+          const filePath = args.path as string;
+          const newContent = args.content as string;
+          const originalContent = '';
+          const diff = diffManager.generateDiff(filePath, originalContent, newContent);
+          yield `\n\`\`\`diff\n${diff}\n\`\`\`\n`;
+
+          artifactStore.create(this.runId, 'diff', `Changes to ${filePath}`, diff, 'completed');
+        }
+
+        // Recurse: send tool result back to model
         const followupMessages = this.messages.map((m) => ({
           role: m.role,
           content: m.content,
@@ -106,9 +190,31 @@ export class AgentEngine {
           }
         }
       }
+
+      if (chunk.type === 'error') {
+        yield `\n❌ **Error:** ${chunk.content}\n`;
+      }
     }
 
-    this.messages.push({ role: 'assistant', content: fullResponse });
+    if (fullResponse) {
+      this.messages.push({ role: 'assistant', content: fullResponse });
+    }
+
+    // Create walkthrough artifact summarizing the work
+    const diffs = artifactStore.getByType('diff');
+    if (diffs.length > 0 || fullResponse) {
+      artifactStore.create(
+        this.runId,
+        'walkthrough',
+        'Session Summary',
+        `### Task\n${userMessage.slice(0, 200)}\n\n### Changes\n${diffs.map((d) => `- ${d.title}`).join('\n')}\n\n### Result\n${fullResponse.slice(0, 500)}`,
+        'completed',
+      );
+    }
+
+    // Persist artifacts
+    await artifactStore.save();
+
     yield '[DONE]';
   }
 }

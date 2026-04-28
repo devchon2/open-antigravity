@@ -15,6 +15,25 @@ async function main(): Promise<void> {
   setupAuth(app);
   setupErrorHandler(app);
 
+  // Root landing page
+  app.get('/', async (_req, reply) => {
+    return reply.type('text/html').send(`<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"/><title>Open-Antigravity Gateway</title>
+<style>body{font-family:sans-serif;max-width:600px;margin:60px auto;padding:20px;background:#0d1117;color:#e6edf3}h1{color:#58a6ff}code{background:#161b22;padding:2px 6px;border-radius:4px}a{color:#58a6ff}</style></head>
+<body>
+<h1>Open-Antigravity Gateway</h1>
+<p>Universal LLM API router — OpenAI, Anthropic, Google, Ollama.</p>
+<h2>Endpoints</h2>
+<ul>
+<li><code>GET /api/health</code> — Server status</li>
+<li><code>GET /api/models</code> — Available models</li>
+<li><code>POST /api/chat</code> — Streaming chat completions</li>
+</ul>
+<p>Dashboard: <a href="http://localhost:3000">localhost:3000</a></p>
+</body></html>`);
+  });
+
   await app.register(healthRoutes);
   await app.register(modelsRoutes);
   await app.register(chatRoutes);

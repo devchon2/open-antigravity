@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body { @apply bg-ag-bg text-ag-text; }
+}
+
+@layer components {
+  .btn-primary { @apply bg-ag-accent text-white px-4 py-2 rounded-md hover:opacity-90 transition disabled:opacity-40; }
+  .btn-ghost { @apply text-ag-muted hover:text-ag-text px-3 py-1 rounded transition text-sm; }
+  .card { @apply bg-ag-surface border border-ag-border rounded-lg; }
+  .input-field { @apply bg-ag-surface border border-ag-border rounded-md px-3 py-2 text-ag-text placeholder-ag-muted focus:outline-none focus:border-ag-accent; }
+}
